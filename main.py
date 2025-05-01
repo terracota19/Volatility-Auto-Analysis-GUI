@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*- 
 
 import os
 import subprocess
@@ -57,14 +57,25 @@ class VolatilityGUI:
         else:
             messagebox.showerror("Error", "Invalid file type. Please select a .raw, .mem, or .dmp file.")
 
+    def get_volatility_path(self):
+        try:
+            vol_path = subprocess.check_output("which vol.py", shell=True).decode().strip()
+            if vol_path:
+                return vol_path
+            else:
+                raise Exception("Volatility script (vol.py) not found in the PATH.")
+        except subprocess.CalledProcessError as e:
+            self.text.insert(tk.END, "[!] Error finding vol.py: {}\n".format(e))
+            return None
+
     def run_imageinfo(self):
         self.text.insert(tk.END, "[*] Running imageinfo...\n")
         
-        # Cambia esto si el path de vol.py es diferente en tu máquina
-        vol_script_path = "vol.py"  # Asume que vol.py está en el mismo directorio o en PATH
+        vol_script_path = self.get_volatility_path()
+        if not vol_script_path:
+            return  
 
         try:
-            # Imprimir el comando que se ejecutará
             cmd = ["python", vol_script_path, "-f", self.memfile, "imageinfo"]
             self.text.insert(tk.END, "[*] Running command: {}\n".format(" ".join(cmd)))
             
@@ -135,9 +146,8 @@ class VolatilityGUI:
 
                 try:
                     plugin_out = os.path.join(self.outdir, "{}.txt".format(plugin))
-                    cmd = ["python", vol_script_path, "-f", self.memfile, "--profile={}".format(self.profile), plugin]
+                    cmd = ["python", self.get_volatility_path(), "-f", self.memfile, "--profile={}".format(self.profile), plugin]
                     
-                    # Imprimir el comando que se va a ejecutar
                     self.text.insert(tk.END, "[*] Running plugin command: {}\n".format(" ".join(cmd)))
                     
                     with open(plugin_out, "w") as f:
