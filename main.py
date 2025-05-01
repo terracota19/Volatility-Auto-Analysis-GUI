@@ -14,12 +14,13 @@ import threading
 class VolatilityGUI:
     def __init__(self, root):
         self.root = root
-        self.root.title("Volatility GUI")
+        self.root.title("Volatility 2.6.1 Graphic User Interface")
         self.memfile = ""
         self.profile = ""
         self.outdir = ""
         self.is_running = False
 
+        
         menubar = tk.Menu(root)
 
         filemenu = tk.Menu(menubar, tearoff=0)
@@ -172,10 +173,15 @@ class VolatilityGUI:
                     plugin_out = os.path.join(self.outdir, "{}.txt".format(plugin))
                     cmd = ["python2", self.get_volatility_path(), "-f", self.memfile, "--profile={}".format(self.profile), plugin]
 
-                    self.insert_text("[*] Running plugin command: {}\n".format(" ".join(cmd)), "info")
+                    command_string = " ".join(cmd)
+                    self.insert_text("[*] Running command: {}\n".format(command_string), "info")
 
                     with open(plugin_out, "w") as f:
                         subprocess.call(cmd, stdout=f, stderr=open(os.devnull, 'w'))
+
+                    if os.path.getsize(plugin_out) == 0:
+                        self.insert_text("[!] No data returned for plugin {}. You might want to try a different profile or dismiss this alert.\n".format(plugin), "error")
+
                 except Exception as e:
                     self.insert_text("[!] Error running {}: {}\n".format(plugin, str(e)), "error")
                     log.write("[!] Error running {}: {}\n".format(plugin, str(e)))
@@ -183,6 +189,8 @@ class VolatilityGUI:
         self.insert_text("[+] Analysis complete. Results in: {}\n".format(self.outdir), "success")
         self.root.update()
         self.stop_button.config(state=tk.DISABLED)
+
+
 
     def stop_analysis(self):
         self.is_running = False
