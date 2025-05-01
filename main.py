@@ -64,7 +64,6 @@ class VolatilityGUI:
         self.text.insert(tk.END, message, tag)
         self.text.see(tk.END)
         self.root.update()
-
     def load_file(self):
         filepath = filedialog.askopenfilename(
             title="Select RAM dump",
@@ -73,22 +72,18 @@ class VolatilityGUI:
 
         if filepath and filepath.lower().endswith(('.raw', '.mem', '.dmp')):
             self.memfile = filepath
+
+            # Reset GUI
+            self.text.delete(1.0, tk.END)
+            self.profile_combobox.set('')
+            self.profile_combobox['values'] = []
+            self.button.config(state=tk.DISABLED)
+            self.stop_button.config(state=tk.DISABLED)
             self.insert_text("[+] File loaded: {}\n".format(self.memfile), "success")
+
             self.run_imageinfo()
-            self.button.config(state=tk.NORMAL)
         else:
             messagebox.showerror("Error", "Invalid file type. Please select a .raw, .mem, or .dmp file.")
-
-    def get_volatility_path(self):
-        try:
-            vol_path = subprocess.check_output("which vol.py", shell=True).strip()
-            if vol_path:
-                return vol_path
-            else:
-                raise Exception("Volatility script (vol.py) not found in the PATH.")
-        except subprocess.CalledProcessError as e:
-            self.insert_text("[!] Error finding vol.py: {}\n".format(e), "error")
-            return None
 
     def run_imageinfo(self):
         self.insert_text("[*] Running imageinfo...\n", "info")
@@ -122,12 +117,27 @@ class VolatilityGUI:
 
             self.profile_combobox['values'] = profiles
             if profiles:
-                self.profile_combobox.set(profiles[0])  
+                self.profile_combobox.set(profiles[0])
                 self.profile = profiles[0]
                 self.insert_text("[+] Profile selected: {}\n".format(self.profile), "success")
+                self.button.config(state=tk.NORMAL)  # Habilitar análisis al tener perfil
 
         except Exception as e:
             self.insert_text("[!] Error executing imageinfo: {}\n".format(str(e)), "error")
+
+
+    def get_volatility_path(self):
+        try:
+            vol_path = subprocess.check_output("which vol.py", shell=True).strip()
+            if vol_path:
+                return vol_path
+            else:
+                raise Exception("Volatility script (vol.py) not found in the PATH.")
+        except subprocess.CalledProcessError as e:
+            self.insert_text("[!] Error finding vol.py: {}\n".format(e), "error")
+            return None
+
+  
 
     def on_profile_select(self, event):
         self.profile = self.profile_combobox.get()
