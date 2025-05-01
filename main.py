@@ -59,13 +59,8 @@ class VolatilityGUI:
 
     def run_imageinfo(self):
         self.text.insert(tk.END, "[*] Running imageinfo...\n")
-
-        # Cambiar esto para ejecutar vol.py en lugar de 'volatility'
-        vol_script_path = "/ruta/a/vol.py"  # Asegúrate de que esta ruta sea correcta
-
-        if not os.path.isfile(vol_script_path):
-            self.text.insert(tk.END, "[!] vol.py not found. Please check installation.\n")
-            return
+       
+        vol_script_path = "vol.py"  
 
         try:
             process = subprocess.Popen(["python", vol_script_path, "-f", self.memfile, "imageinfo"],
