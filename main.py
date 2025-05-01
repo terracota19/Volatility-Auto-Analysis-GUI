@@ -1,5 +1,6 @@
 import os
 import subprocess
+import shutil
 import Tkinter as tk
 import ttk
 import tkFileDialog as filedialog
@@ -40,24 +41,34 @@ class VolatilityGUI:
         self.stop_button.config(state=tk.DISABLED)
 
     def load_file(self):
-
         filepath = filedialog.askopenfilename(
             title="Select RAM dump",
-            filetypes=[("All files", "*.*"), ("Raw files", "*.raw"), ("Memory files", "*.mem"), ("Dump files", "*.dmp")]
+            filetypes=[("Memory files", "*.raw *.mem *.dmp"), ("All files", "*.*")]
         )
 
-        if filepath:
+        if filepath and filepath.lower().endswith(('.raw', '.mem', '.dmp')):
             self.memfile = filepath
             self.text.insert(tk.END, "[+] File loaded: {}\n".format(self.memfile))
             self.run_imageinfo()
             self.button.config(state=tk.NORMAL)
+        else:
+            messagebox.showerror("Error", "Invalid file type. Please select a .raw, .mem, or .dmp file.")
 
     def run_imageinfo(self):
         self.text.insert(tk.END, "[*] Running imageinfo...\n")
+
+        # Puedes modificar esto si volatility no está en el PATH
+        volatility_path = shutil.which("volatility") or "/usr/bin/volatility"
+
+        if not os.path.isfile(volatility_path):
+            self.text.insert(tk.END, "[!] Volatility not found. Please check installation.\n")
+            return
+
         try:
-            process = subprocess.Popen(["volatility", "-f", self.memfile, "imageinfo"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            process = subprocess.Popen([volatility_path, "-f", self.memfile, "imageinfo"],
+                                       stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             stdout, stderr = process.communicate()
-            decoded_output = stdout
+            decoded_output = stdout.decode("utf-8", errors="replace")
             self.text.insert(tk.END, decoded_output + "\n")
 
             profiles = []
