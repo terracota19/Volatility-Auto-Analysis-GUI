@@ -1,7 +1,10 @@
 import os
 import subprocess
 import Tkinter as tk
-from Tkinter import filedialog, messagebox, scrolledtext, ttk
+import ttk
+import tkFileDialog as filedialog
+import tkMessageBox as messagebox
+import ScrolledText as scrolledtext
 import threading
 
 class VolatilityGUI:
@@ -40,7 +43,7 @@ class VolatilityGUI:
         filepath = filedialog.askopenfilename(title="Select RAM dump", filetypes=[("Memory files", "*.raw;*.mem;*.dmp")])
         if filepath:
             self.memfile = filepath
-            self.text.insert(tk.END, f"[+] File loaded: {self.memfile}\n")
+            self.text.insert(tk.END, "[+] File loaded: {}\n".format(self.memfile))
             self.run_imageinfo()
             self.button.config(state=tk.NORMAL)
 
@@ -49,8 +52,7 @@ class VolatilityGUI:
         try:
             process = subprocess.Popen(["volatility", "-f", self.memfile, "imageinfo"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             stdout, stderr = process.communicate()
-
-            decoded_output = stdout.decode("utf-8") if isinstance(stdout, str) else stdout
+            decoded_output = stdout
             self.text.insert(tk.END, decoded_output + "\n")
 
             profiles = []
@@ -58,19 +60,18 @@ class VolatilityGUI:
                 if "Suggested Profile(s)" in line:
                     profiles = line.split(":")[1].split(",")
                     profiles = [p.strip() for p in profiles]
-                    self.text.insert(tk.END, f"[+] Suggested profiles: {', '.join(profiles)}\n")
+                    self.text.insert(tk.END, "[+] Suggested profiles: {}\n".format(", ".join(profiles)))
                     break
 
             self.profile_combobox['values'] = profiles
-            self.profile_combobox.set(profiles[0])
-        except subprocess.CalledProcessError as e:
-            self.text.insert(tk.END, f"[!] Error running imageinfo: {e.output.decode()}\n")
+            if profiles:
+                self.profile_combobox.set(profiles[0])
         except Exception as e:
-            self.text.insert(tk.END, f"[!] Unexpected error: {str(e)}\n")
+            self.text.insert(tk.END, "[!] Error running imageinfo: {}\n".format(str(e)))
 
     def on_profile_select(self, event):
         self.profile = self.profile_combobox.get()
-        self.text.insert(tk.END, f"[+] Profile selected: {self.profile}\n")
+        self.text.insert(tk.END, "[+] Profile selected: {}\n".format(self.profile))
 
     def run_analysis(self):
         if not self.profile:
@@ -83,8 +84,9 @@ class VolatilityGUI:
 
         filename = os.path.basename(self.memfile)
         name = os.path.splitext(filename)[0]
-        self.outdir = os.path.join(self.outdir, f"case-{self.profile}-{name}")
-        os.makedirs(self.outdir, exist_ok=True)
+        self.outdir = os.path.join(self.outdir, "case-{}-{}".format(self.profile, name))
+        if not os.path.exists(self.outdir):
+            os.makedirs(self.outdir)
 
         plugins = ["pslist", "pstree", "psscan", "netscan", "filescan", "dlllist", "cmdscan", "consoles", "hivelist", "malfind"]
 
@@ -95,7 +97,7 @@ class VolatilityGUI:
         threading.Thread(target=self.run_plugins, args=(plugins,)).start()
 
     def run_plugins(self, plugins):
-        self.text.insert(tk.END, f"[*] Starting analysis with profile {self.profile}...\n")
+        self.text.insert(tk.END, "[*] Starting analysis with profile {}...\n".format(self.profile))
         self.root.update()
 
         log_file = os.path.join(self.outdir, "log.txt")
@@ -103,18 +105,20 @@ class VolatilityGUI:
             for plugin in plugins:
                 if not self.is_running:
                     break
-                self.text.insert(tk.END, f"[*] Running {plugin}...\n")
+                self.text.insert(tk.END, "[*] Running {}...\n".format(plugin))
                 self.root.update()
-                log.write(f"[*] Running {plugin}\n")
+                log.write("[*] Running {}\n".format(plugin))
 
                 try:
-                    with open(f"{self.outdir}/{plugin}.txt", "w") as f:
-                        subprocess.run(["volatility", "-f", self.memfile, "--profile=" + self.profile, plugin], stdout=f, stderr=subprocess.DEVNULL)
+                    plugin_out = os.path.join(self.outdir, "{}.txt".format(plugin))
+                    cmd = ["volatility", "-f", self.memfile, "--profile={}".format(self.profile), plugin]
+                    with open(plugin_out, "w") as f:
+                        subprocess.call(cmd, stdout=f, stderr=open(os.devnull, 'w'))
                 except Exception as e:
-                    self.text.insert(tk.END, f"[!] Error running {plugin}: {str(e)}\n")
-                    log.write(f"[!] Error running {plugin}: {str(e)}\n")
+                    self.text.insert(tk.END, "[!] Error running {}: {}\n".format(plugin, str(e)))
+                    log.write("[!] Error running {}: {}\n".format(plugin, str(e)))
 
-        self.text.insert(tk.END, f"[+] Analysis complete. Results in: {self.outdir}\n")
+        self.text.insert(tk.END, "[+] Analysis complete. Results in: {}\n".format(self.outdir))
         self.root.update()
         self.stop_button.config(state=tk.DISABLED)
 
