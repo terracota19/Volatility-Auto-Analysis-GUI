@@ -60,15 +60,15 @@ class VolatilityGUI:
     def run_imageinfo(self):
         self.text.insert(tk.END, "[*] Running imageinfo...\n")
 
-        # Puedes modificar esto si volatility no está en el PATH
-        volatility_path = shutil.which("volatility") or "/usr/bin/volatility"
+        # Cambiar esto para ejecutar vol.py en lugar de 'volatility'
+        vol_script_path = "/ruta/a/vol.py"  # Asegúrate de que esta ruta sea correcta
 
-        if not os.path.isfile(volatility_path):
-            self.text.insert(tk.END, "[!] Volatility not found. Please check installation.\n")
+        if not os.path.isfile(vol_script_path):
+            self.text.insert(tk.END, "[!] vol.py not found. Please check installation.\n")
             return
 
         try:
-            process = subprocess.Popen([volatility_path, "-f", self.memfile, "imageinfo"],
+            process = subprocess.Popen(["python", vol_script_path, "-f", self.memfile, "imageinfo"],
                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             stdout, stderr = process.communicate()
             decoded_output = stdout.decode("utf-8", errors="replace")
@@ -130,7 +130,7 @@ class VolatilityGUI:
 
                 try:
                     plugin_out = os.path.join(self.outdir, "{}.txt".format(plugin))
-                    cmd = ["volatility", "-f", self.memfile, "--profile={}".format(self.profile), plugin]
+                    cmd = ["python", vol_script_path, "-f", self.memfile, "--profile={}".format(self.profile), plugin]
                     with open(plugin_out, "w") as f:
                         subprocess.call(cmd, stdout=f, stderr=open(os.devnull, 'w'))
                 except Exception as e:
