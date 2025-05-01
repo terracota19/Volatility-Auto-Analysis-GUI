@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*- 
+# -*- coding: utf-8 -*-
 
 import os
 import subprocess
@@ -70,18 +70,23 @@ class VolatilityGUI:
 
     def run_imageinfo(self):
         self.text.insert(tk.END, "[*] Running imageinfo...\n")
-        
+        self.text.insert(tk.END, "[*] Executing vol.py with command: python2 vol.py -f {} imageinfo\n".format(self.memfile))
+        self.root.update()  # Actualiza la interfaz para mostrar el mensaje de "Ejecutando..."
+
         vol_script_path = self.get_volatility_path()
         if not vol_script_path:
-            return  
+            return
 
         try:
             cmd = ["python2", vol_script_path, "-f", self.memfile, "imageinfo"]
-            self.text.insert(tk.END, "[*] Running command: {}\n".format(" ".join(cmd)))
-            
-            process = subprocess.Popen(cmd,
-                                       stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            stdout, stderr = process.communicate()
+
+            # Mostrar que el proceso está en ejecución
+            self.text.insert(tk.END, "[*] Ejecutando el comando... Por favor, espere.\n")
+            self.root.update()  # Refresca la interfaz para que se vea el mensaje.
+
+            # Ejecuta el proceso sin esperar un timeout usando un bucle simple.
+            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            stdout, stderr = process.communicate()  # Sin timeout, simplemente espera a que termine
 
             if stderr:
                 self.text.insert(tk.END, "[!] Error: {}\n".format(stderr.decode("utf-8")))
@@ -101,8 +106,10 @@ class VolatilityGUI:
             if profiles:
                 self.profile_combobox.set(profiles[0])
 
+        except subprocess.CalledProcessError as e:
+            self.text.insert(tk.END, "[!] Error ejecutando imageinfo: {}\n".format(str(e)))
         except Exception as e:
-            self.text.insert(tk.END, "[!] Error running imageinfo: {}\n".format(str(e)))
+            self.text.insert(tk.END, "[!] Error ejecutando imageinfo: {}\n".format(str(e)))
 
     def on_profile_select(self, event):
         self.profile = self.profile_combobox.get()
@@ -147,9 +154,9 @@ class VolatilityGUI:
                 try:
                     plugin_out = os.path.join(self.outdir, "{}.txt".format(plugin))
                     cmd = ["python2", self.get_volatility_path(), "-f", self.memfile, "--profile={}".format(self.profile), plugin]
-                    
+
                     self.text.insert(tk.END, "[*] Running plugin command: {}\n".format(" ".join(cmd)))
-                    
+
                     with open(plugin_out, "w") as f:
                         subprocess.call(cmd, stdout=f, stderr=open(os.devnull, 'w'))
                 except Exception as e:
