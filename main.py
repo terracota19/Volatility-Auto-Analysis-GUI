@@ -1,8 +1,7 @@
 import os
 import subprocess
-import tkinter as tk
-from tkinter import filedialog, messagebox, scrolledtext, ttk
-from tkinter import simpledialog
+import Tkinter as tk
+from Tkinter import filedialog, messagebox, scrolledtext, ttk
 import threading
 
 class VolatilityGUI:
@@ -14,30 +13,25 @@ class VolatilityGUI:
         self.outdir = ""
         self.is_running = False
 
-        # Menú
         menubar = tk.Menu(root)
         filemenu = tk.Menu(menubar, tearoff=0)
         filemenu.add_command(label="Load", command=self.load_file)
         menubar.add_cascade(label="File", menu=filemenu)
         root.config(menu=menubar)
 
-        # Área de texto
         self.text = scrolledtext.ScrolledText(root, width=100, height=20)
         self.text.pack(padx=10, pady=10)
 
-        # Lista desplegable para elegir el perfil
         self.profile_label = tk.Label(root, text="Select Profile:")
         self.profile_label.pack(padx=10, pady=5)
         self.profile_combobox = ttk.Combobox(root, state="readonly")
         self.profile_combobox.pack(padx=10, pady=5)
         self.profile_combobox.bind("<<ComboboxSelected>>", self.on_profile_select)
 
-        # Botón para análisis completo
         self.button = tk.Button(root, text="Run Full Analysis", command=self.run_analysis)
         self.button.pack(pady=10)
         self.button.config(state=tk.DISABLED)
 
-        # Botón para detener el análisis
         self.stop_button = tk.Button(root, text="Stop Analysis", command=self.stop_analysis)
         self.stop_button.pack(pady=10)
         self.stop_button.config(state=tk.DISABLED)
@@ -53,11 +47,12 @@ class VolatilityGUI:
     def run_imageinfo(self):
         self.text.insert(tk.END, "[*] Running imageinfo...\n")
         try:
-            output = subprocess.check_output(["volatility", "-f", self.memfile, "imageinfo"], stderr=subprocess.STDOUT)
-            decoded_output = output.decode("utf-8")
+            process = subprocess.Popen(["volatility", "-f", self.memfile, "imageinfo"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            stdout, stderr = process.communicate()
+
+            decoded_output = stdout.decode("utf-8") if isinstance(stdout, str) else stdout
             self.text.insert(tk.END, decoded_output + "\n")
 
-            # Extract suggested profiles
             profiles = []
             for line in decoded_output.splitlines():
                 if "Suggested Profile(s)" in line:
@@ -66,9 +61,8 @@ class VolatilityGUI:
                     self.text.insert(tk.END, f"[+] Suggested profiles: {', '.join(profiles)}\n")
                     break
 
-            # Populate combobox with suggested profiles
             self.profile_combobox['values'] = profiles
-            self.profile_combobox.set(profiles[0])  # Default to the first profile
+            self.profile_combobox.set(profiles[0])
         except subprocess.CalledProcessError as e:
             self.text.insert(tk.END, f"[!] Error running imageinfo: {e.output.decode()}\n")
         except Exception as e:
@@ -83,10 +77,9 @@ class VolatilityGUI:
             messagebox.showerror("Error", "No valid profile selected.")
             return
 
-        # Ask the user for the destination folder
         self.outdir = filedialog.askdirectory(title="Select Output Folder")
         if not self.outdir:
-            return  # User cancelled the directory selection
+            return
 
         filename = os.path.basename(self.memfile)
         name = os.path.splitext(filename)[0]
@@ -95,7 +88,6 @@ class VolatilityGUI:
 
         plugins = ["pslist", "pstree", "psscan", "netscan", "filescan", "dlllist", "cmdscan", "consoles", "hivelist", "malfind"]
 
-        # Start the analysis in a separate thread
         self.is_running = True
         self.button.config(state=tk.DISABLED)
         self.stop_button.config(state=tk.NORMAL)
@@ -133,7 +125,6 @@ class VolatilityGUI:
         self.stop_button.config(state=tk.DISABLED)
         self.button.config(state=tk.NORMAL)
 
-# Start the app
 if __name__ == "__main__":
     root = tk.Tk()
     app = VolatilityGUI(root)
