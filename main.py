@@ -59,13 +59,22 @@ class VolatilityGUI:
 
     def run_imageinfo(self):
         self.text.insert(tk.END, "[*] Running imageinfo...\n")
-       
-        vol_script_path = "vol.py"  
+        
+        # Cambia esto si el path de vol.py es diferente en tu máquina
+        vol_script_path = "vol.py"  # Asume que vol.py está en el mismo directorio o en PATH
 
         try:
-            process = subprocess.Popen(["python", vol_script_path, "-f", self.memfile, "imageinfo"],
+            # Imprimir el comando que se ejecutará
+            cmd = ["python", vol_script_path, "-f", self.memfile, "imageinfo"]
+            self.text.insert(tk.END, "[*] Running command: {}\n".format(" ".join(cmd)))
+            
+            process = subprocess.Popen(cmd,
                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             stdout, stderr = process.communicate()
+
+            if stderr:
+                self.text.insert(tk.END, "[!] Error: {}\n".format(stderr.decode("utf-8")))
+
             decoded_output = stdout.decode("utf-8", errors="replace")
             self.text.insert(tk.END, decoded_output + "\n")
 
@@ -80,6 +89,7 @@ class VolatilityGUI:
             self.profile_combobox['values'] = profiles
             if profiles:
                 self.profile_combobox.set(profiles[0])
+
         except Exception as e:
             self.text.insert(tk.END, "[!] Error running imageinfo: {}\n".format(str(e)))
 
@@ -126,6 +136,10 @@ class VolatilityGUI:
                 try:
                     plugin_out = os.path.join(self.outdir, "{}.txt".format(plugin))
                     cmd = ["python", vol_script_path, "-f", self.memfile, "--profile={}".format(self.profile), plugin]
+                    
+                    # Imprimir el comando que se va a ejecutar
+                    self.text.insert(tk.END, "[*] Running plugin command: {}\n".format(" ".join(cmd)))
+                    
                     with open(plugin_out, "w") as f:
                         subprocess.call(cmd, stdout=f, stderr=open(os.devnull, 'w'))
                 except Exception as e:
