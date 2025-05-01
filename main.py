@@ -40,7 +40,12 @@ class VolatilityGUI:
         self.stop_button.config(state=tk.DISABLED)
 
     def load_file(self):
-        filepath = filedialog.askopenfilename(title="Select RAM dump", filetypes=[("Memory files", "*.raw;*.mem;*.dmp")])
+
+        filepath = filedialog.askopenfilename(
+            title="Select RAM dump",
+            filetypes=[("All files", "*.*"), ("Raw files", "*.raw"), ("Memory files", "*.mem"), ("Dump files", "*.dmp")]
+        )
+
         if filepath:
             self.memfile = filepath
             self.text.insert(tk.END, "[+] File loaded: {}\n".format(self.memfile))
