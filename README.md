@@ -2,6 +2,8 @@
 A Python2 GUI tool to automate memory dump analysis using Volatility 2.6.1  [Volatility Framework](https://www.volatilityfoundation.org/).
 It allows users to load memory files, automatically detects the correct profile with imageinfo, and runs common forensic commands. Results are organized into case folders for easy review.
 
+![image](https://github.com/user-attachments/assets/9e7e69a5-404d-4e2e-af52-32b5624f2f19)
+
 ## Features
 
 - Load memory dump files (`.raw`, `.mem`, `.dmp`)
