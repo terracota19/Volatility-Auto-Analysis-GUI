@@ -28,7 +28,7 @@ class VolatilityGUI:
         menubar.add_cascade(label="File", menu=filemenu)
 
         procdump_menu = tk.Menu(menubar, tearoff=0)
-        procdump_menu.add_command(label="Run ProcDump", command=self.run_procdump)
+        procdump_menu.add_command(label="Run ProcDump", command=self.run_dumpproc)
         menubar.add_cascade(label="ProcDump", menu=procdump_menu)
 
         dumpfiles_menu = tk.Menu(menubar, tearoff=0)
@@ -198,32 +198,165 @@ class VolatilityGUI:
         self.root.update()
         self.stop_button.config(state=tk.DISABLED)
         self.button.config(state=tk.NORMAL)
-
-    def run_procdump(self):
-        if not self.memfile:
-            messagebox.showerror("Error", "No RAM dump file loaded.")
+    
+    def run_dumpproc(self):
+        if not self.memfile or not self.profile:
+            messagebox.showerror("Error", "Memory file and profile must be loaded first.")
             return
 
-        cmd = ["procdump", "-Q", "0x000000003ecec2b0", "-u", "-n", "-D", "."]
-        self.insert_text("[*] Running ProcDump...\n", "info")
+        self.insert_text("[*] Gathering process list with pslist...\n", "info")
         try:
-            subprocess.call(cmd)
-            self.insert_text("[+] ProcDump completed successfully.\n", "success")
+            cmd = ["python2", self.get_volatility_path(), "-f", self.memfile, "--profile={}".format(self.profile), "pslist"]
+            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            stdout, stderr = process.communicate()
+            if stderr:
+                self.insert_text("[!] Error: {}\n".format(stderr.decode("utf-8")), "error")
+                return
+
+            decoded_output = stdout.decode("utf-8", errors="replace")
+            lines = decoded_output.strip().splitlines()
+
+            entries = []
+            for line in lines:
+                parts = line.split()
+                if len(parts) >= 3 and parts[0] != "Offset":
+                    pid = parts[2]
+                    imagename = parts[-1]
+                    entries.append((imagename, pid))
+
+            if not entries:
+                self.insert_text("[!] No processes found.\n", "error")
+                return
+
+            selection_window = tk.Toplevel(self.root)
+            selection_window.title("Select a process to dump")
+
+            listbox = tk.Listbox(selection_window, width=50, height=20)
+            for name, pid in entries:
+                listbox.insert(tk.END, "{} -- {}".format(name, pid))
+            listbox.pack(padx=10, pady=10)
+
+            def on_select():
+                selection = listbox.curselection()
+                if not selection:
+                    messagebox.showerror("Error", "No process selected.")
+                    return
+
+                name, pid = entries[selection[0]]
+                outdir = self.outdir or os.path.join(os.path.dirname(self.memfile), "case-{}-{}".format(self.profile, os.path.splitext(os.path.basename(self.memfile))[0]))
+                if not os.path.exists(outdir):
+                    os.makedirs(outdir)
+
+                folder = os.path.join(outdir, "{}_PID{}".format(name, pid))
+                if not os.path.exists(folder):
+                    os.makedirs(folder)
+
+                dump_cmd = ["procdump", "-p", pid, "-D", folder]
+                self.insert_text("[*] Running command: {}\n".format(" ".join(dump_cmd)), "info")
+
+                try:
+                    subprocess.call(dump_cmd)
+                    self.insert_text("[+] ProcDump for {} (PID {}) completed.\n".format(name, pid), "success")
+                except Exception as e:
+                    self.insert_text("[!] Error running procdump: {}\n".format(str(e)), "error")
+
+                selection_window.destroy()
+
+            select_button = tk.Button(selection_window, text="Dump Selected Process", command=on_select)
+            select_button.pack(pady=5)
+
         except Exception as e:
-            self.insert_text("[!] Error running ProcDump: {}\n".format(str(e)), "error")
+            self.insert_text("[!] Exception during dumpproc: {}\n".format(str(e)), "error")
 
     def run_dumpfiles(self):
-        if not self.memfile:
-            messagebox.showerror("Error", "No RAM dump file loaded.")
+        if not self.memfile or not self.profile:
+            messagebox.showerror("Error", "Memory file and profile must be loaded first.")
             return
 
-        cmd = ["dumpfiles", "-Q", "0x000000003ecec2b0", "-u", "-n", "-D", "."]
-        self.insert_text("[*] Running DumpFiles...\n", "info")
+        self.insert_text("[*] Running filescan to detect files...\n", "info")
+
         try:
-            subprocess.call(cmd)
-            self.insert_text("[+] DumpFiles completed successfully.\n", "success")
+            cmd = [
+                "python2", self.get_volatility_path(),
+                "-f", self.memfile,
+                "--profile={}".format(self.profile),
+                "filescan"
+            ]
+            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            stdout, stderr = process.communicate()
+
+            if stderr:
+                self.insert_text("[!] Error during filescan: {}\n".format(stderr.decode("utf-8")), "error")
+                return
+
+            decoded_output = stdout.decode("utf-8", errors="replace")
+            lines = decoded_output.strip().splitlines()
+
+            entries = []
+            for line in lines:
+                parts = line.split()
+                if len(parts) >= 6 and parts[0].startswith("0x"):
+                    offset = parts[0]
+                    filename = parts[-1]
+                    entries.append((offset, filename))
+
+            if not entries:
+                self.insert_text("[!] No files found by filescan.\n", "error")
+                return
+
+            # GUI para seleccionar un archivo
+            selection_window = tk.Toplevel(self.root)
+            selection_window.title("Select a file to dump")
+
+            listbox = tk.Listbox(selection_window, width=80, height=20)
+            for offset, name in entries:
+                listbox.insert(tk.END, "{} - {}".format(offset, name))
+            listbox.pack(padx=10, pady=10)
+
+            def on_select():
+                selection = listbox.curselection()
+                if not selection:
+                    messagebox.showerror("Error", "No file selected.")
+                    return
+
+                offset, name = entries[selection[0]]
+                outdir = filedialog.askdirectory(title="Select Output Folder for Dumped File")
+                if not outdir:
+                    return
+
+                dump_cmd = [
+                    "python2", self.get_volatility_path(),
+                    "-f", self.memfile,
+                    "--profile={}".format(self.profile),
+                    "dumpfiles",
+                    "-Q", offset,
+                    "-u", "-n", "-D", outdir
+                ]
+
+                self.insert_text("[*] Running dumpfiles on offset {} (file: {})\n".format(offset, name), "info")
+                self.insert_text("[*] Command: {}\n".format(" ".join(dump_cmd)), "info")
+
+                try:
+                    process = subprocess.Popen(dump_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                    stdout, stderr = process.communicate()
+
+                    if stderr:
+                        self.insert_text("[!] Error: {}\n".format(stderr.decode("utf-8")), "error")
+
+                    output = stdout.decode("utf-8", errors="replace")
+                    self.insert_text(output + "\n", "info")
+                    self.insert_text("[+] File dumped successfully to {}\n".format(outdir), "success")
+
+                except Exception as e:
+                    self.insert_text("[!] Error running dumpfiles: {}\n".format(str(e)), "error")
+
+                selection_window.destroy()
+
+            select_button = tk.Button(selection_window, text="Dump Selected File", command=on_select)
+            select_button.pack(pady=5)
+
         except Exception as e:
-            self.insert_text("[!] Error running DumpFiles: {}\n".format(str(e)), "error")
+            self.insert_text("[!] Exception during dumpfiles: {}\n".format(str(e)), "error")
 
 if __name__ == "__main__":
     root = tk.Tk()
