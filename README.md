@@ -1,5 +1,5 @@
-# Volatility-Auto-Analysis-GUI
-A Python GUI tool to automate memory dump analysis using Volatility 2.6.1  [Volatility Framework](https://www.volatilityfoundation.org/).
+# Volatility-Auto-Analysis-GUI 
+A Python2 GUI tool to automate memory dump analysis using Volatility 2.6.1  [Volatility Framework](https://www.volatilityfoundation.org/).
 It allows users to load memory files, automatically detects the correct profile with imageinfo, and runs common forensic commands. Results are organized into case folders for easy review.
 
 ## Features
