@@ -21,18 +21,29 @@ class VolatilityGUI:
         self.is_running = False
 
         menubar = tk.Menu(root)
+
         filemenu = tk.Menu(menubar, tearoff=0)
         filemenu.add_command(label="Load", command=self.load_file)
         menubar.add_cascade(label="File", menu=filemenu)
+
+        procdump_menu = tk.Menu(menubar, tearoff=0)
+        procdump_menu.add_command(label="Run ProcDump", command=self.run_procdump)
+        menubar.add_cascade(label="ProcDump", menu=procdump_menu)
+
+        dumpfiles_menu = tk.Menu(menubar, tearoff=0)
+        dumpfiles_menu.add_command(label="Run DumpFiles", command=self.run_dumpfiles)
+        menubar.add_cascade(label="DumpFiles", menu=dumpfiles_menu)
+
         root.config(menu=menubar)
 
         self.text = scrolledtext.ScrolledText(root, width=100, height=25)
         self.text.pack(padx=10, pady=10)
 
-        # Configurar tags de color
         self.text.tag_config("info", foreground="blue")
         self.text.tag_config("success", foreground="green")
         self.text.tag_config("error", foreground="red")
+        self.text.tag_config("init", foreground="purple")
+        self.insert_text("[+] Please load RAM memory file...to continue\n", "init")
 
         self.profile_label = tk.Label(root, text="Select Profile:")
         self.profile_label.pack(padx=10, pady=5)
@@ -88,7 +99,7 @@ class VolatilityGUI:
 
         try:
             cmd = ["python2", vol_script_path, "-f", self.memfile, "imageinfo"]
-            self.insert_text("[*] Ejecutando el comando... Por favor, espere.\n", "info")
+            self.insert_text("[*] Executing the command... Please wait.\n", "info")
             self.root.update()
 
             process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -110,12 +121,12 @@ class VolatilityGUI:
 
             self.profile_combobox['values'] = profiles
             if profiles:
-                self.profile_combobox.set(profiles[0])  # Selección automática
+                self.profile_combobox.set(profiles[0])  
                 self.profile = profiles[0]
                 self.insert_text("[+] Profile selected: {}\n".format(self.profile), "success")
 
         except Exception as e:
-            self.insert_text("[!] Error ejecutando imageinfo: {}\n".format(str(e)), "error")
+            self.insert_text("[!] Error executing imageinfo: {}\n".format(str(e)), "error")
 
     def on_profile_select(self, event):
         self.profile = self.profile_combobox.get()
@@ -179,6 +190,32 @@ class VolatilityGUI:
         self.root.update()
         self.stop_button.config(state=tk.DISABLED)
         self.button.config(state=tk.NORMAL)
+
+    def run_procdump(self):
+        if not self.memfile:
+            messagebox.showerror("Error", "No RAM dump file loaded.")
+            return
+
+        cmd = ["procdump", "-Q", "0x000000003ecec2b0", "-u", "-n", "-D", "."]
+        self.insert_text("[*] Running ProcDump...\n", "info")
+        try:
+            subprocess.call(cmd)
+            self.insert_text("[+] ProcDump completed successfully.\n", "success")
+        except Exception as e:
+            self.insert_text("[!] Error running ProcDump: {}\n".format(str(e)), "error")
+
+    def run_dumpfiles(self):
+        if not self.memfile:
+            messagebox.showerror("Error", "No RAM dump file loaded.")
+            return
+
+        cmd = ["dumpfiles", "-Q", "0x000000003ecec2b0", "-u", "-n", "-D", "."]
+        self.insert_text("[*] Running DumpFiles...\n", "info")
+        try:
+            subprocess.call(cmd)
+            self.insert_text("[+] DumpFiles completed successfully.\n", "success")
+        except Exception as e:
+            self.insert_text("[!] Error running DumpFiles: {}\n".format(str(e)), "error")
 
 if __name__ == "__main__":
     root = tk.Tk()
