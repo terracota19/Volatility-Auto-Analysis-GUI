@@ -76,7 +76,7 @@ class VolatilityGUI:
             return  
 
         try:
-            cmd = ["python", vol_script_path, "-f", self.memfile, "imageinfo"]
+            cmd = ["python2", vol_script_path, "-f", self.memfile, "imageinfo"]
             self.text.insert(tk.END, "[*] Running command: {}\n".format(" ".join(cmd)))
             
             process = subprocess.Popen(cmd,
@@ -146,7 +146,7 @@ class VolatilityGUI:
 
                 try:
                     plugin_out = os.path.join(self.outdir, "{}.txt".format(plugin))
-                    cmd = ["python", self.get_volatility_path(), "-f", self.memfile, "--profile={}".format(self.profile), plugin]
+                    cmd = ["python2", self.get_volatility_path(), "-f", self.memfile, "--profile={}".format(self.profile), plugin]
                     
                     self.text.insert(tk.END, "[*] Running plugin command: {}\n".format(" ".join(cmd)))
                     
