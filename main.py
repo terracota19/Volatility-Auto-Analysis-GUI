@@ -215,34 +215,37 @@ class VolatilityGUI:
             messagebox.showerror("Error", "Memory file and profile must be loaded first.")
             return
 
-        self.insert_text("[*] Gathering process list with psscan...\n", "info")
+        self.insert_text("[*] Gathering process list with pslist...\n", "info")
         try:
-            cmd = ["python2", self.get_volatility_path(), "-f", self.memfile, "--profile={}".format(self.profile), "psscan"]
+            # Cambiar de psscan a pslist
+            cmd = ["python2", self.get_volatility_path(), "-f", self.memfile, "--profile={}".format(self.profile), "pslist"]
             process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             stdout, stderr = process.communicate()
-            
+
             decoded_output = stdout.decode("utf-8", errors="replace")
             lines = decoded_output.strip().splitlines()
             entries = []
+
             for line in lines:
+                if line.startswith("Offset"):
+                    continue
+
                 parts = line.split()
-                if len(parts) >= 5 and parts[0] != "Offset":
-                    # Reconstruir el nombre del proceso (columna 1 en adelante hasta la penúltima -2)
-                    name_parts = parts[1:-2]
-                    name = " ".join(name_parts)
-                    pid = parts[-2]
-                    created = parts[-1]
-                    entries.append((name, pid, created))
+
+                if len(parts) >= 6:
+                    name = parts[1]  
+                    entries.append(name)  
 
             if not entries:
-                self.insert_text("[!] No processes found with the current profile using psscan. Consider trying a different profile.\n", "error")
+                self.insert_text("[!] No processes found with the current profile using pslist. Consider trying a different profile.\n", "error")
                 return
 
+            # Crear ventana de selección
             selection_window = tk.Toplevel(self.root)
             selection_window.title("Select process(es) to dump")
             listbox = tk.Listbox(selection_window, width=70, height=20, selectmode=tk.MULTIPLE)
-            for i, (name, pid, created) in enumerate(entries):
-                listbox.insert(tk.END, "{:<40} PID: {:<6} Created: {}".format(name, pid, created))
+            for name in entries:
+                listbox.insert(tk.END, name) 
             listbox.pack(padx=10, pady=10)
 
             def on_dump_selected():
@@ -257,22 +260,22 @@ class VolatilityGUI:
 
                 self.insert_text("[*] Dumping selected processes...\n", "info")
                 for index in selected_indices:
-                    name, pid, _ = entries[index]
+                    name = entries[index]  # Solo el nombre del proceso
                     sanitized_name = name.replace(" ", "_").replace("\\", "_").replace("/", "_").replace(":", "_")
-                    process_folder = os.path.join(output_dir, "{}_PID{}".format(sanitized_name, pid))
+                    process_folder = os.path.join(output_dir, "{}".format(sanitized_name))
                     if not os.path.exists(process_folder):
                         os.makedirs(process_folder)
 
-                    dump_cmd = ["python2", self.get_volatility_path(), "-f", self.memfile, "--profile={}".format(self.profile), "procdump", "-p", pid, "-D", process_folder]
+                    dump_cmd = ["python2", self.get_volatility_path(), "-f", self.memfile, "--profile={}".format(self.profile), "procdump", "-p", name, "-D", process_folder]
                     self.insert_text("[*] Running command: {}\n".format(" ".join(dump_cmd)), "info")
                     try:
                         subprocess.call(dump_cmd, stdout=open(os.devnull, 'w'), stderr=subprocess.PIPE)
                         if os.listdir(process_folder):
-                            self.insert_text("[+] Dumped {} (PID {}) to {}\n".format(name, pid, process_folder), "success")
+                            self.insert_text("[+] Dumped process {} to {}\n".format(name, process_folder), "success")
                         else:
-                            self.insert_text("[!] No data dumped for {} (PID {}). Consider trying a different profile.\n".format(name, pid), "error")
+                            self.insert_text("[!] No data dumped for process {}. Consider trying a different profile.\n".format(name), "error")
                     except Exception as e:
-                        self.insert_text("[!] Error dumping {} (PID {}): {}\n".format(name, pid, str(e)), "error")
+                        self.insert_text("[!] Error dumping process {}: {}\n".format(name, str(e)), "error")
 
                 self.insert_text("[+] Process dumping completed.\n", "success")
                 selection_window.destroy()
@@ -299,17 +302,16 @@ class VolatilityGUI:
             process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             stdout, stderr = process.communicate()
 
-
             decoded_output = stdout.decode("utf-8", errors="replace")
             lines = decoded_output.strip().splitlines()
             entries = []
             for line in lines:
                 parts = line.split()
                 if len(parts) >= 6 and parts[0].startswith("0x"):
-                    offset = parts[0]
-                    name_parts = parts[5:] # El nombre del archivo comienza en la sexta columna
-                    name = " ".join(name_parts)
-                    entries.append((offset, name))
+                    name_parts = parts[5:]  
+                    name = " ".join(name_parts) 
+                   
+                    entries.append(os.path.basename(name))  
 
             if not entries:
                 self.insert_text("[!] No files found with the current profile. Consider trying a different profile.\n", "error")
@@ -318,8 +320,8 @@ class VolatilityGUI:
             selection_window = tk.Toplevel(self.root)
             selection_window.title("Select file(s) to dump")
             listbox = tk.Listbox(selection_window, width=80, height=20, selectmode=tk.MULTIPLE)
-            for i, (offset, name) in enumerate(entries):
-                listbox.insert(tk.END, "{:<60} Offset: {}".format(name, offset))
+            for name in entries:
+                listbox.insert(tk.END, name)  
             listbox.pack(padx=10, pady=10)
 
             def on_dump_selected():
@@ -334,27 +336,28 @@ class VolatilityGUI:
 
                 self.insert_text("[*] Dumping selected files...\n", "info")
                 for index in selected_indices:
-                    offset, name = entries[index]
-                    sanitized_name = name.replace("\\", "_").replace("/", "_").replace(":", "_") # Sanitizar el nombre para evitar problemas con el sistema de archivos
+                    name = entries[index]  
+                    sanitized_name = name.replace("\\", "_").replace("/", "_").replace(":", "_")  
                     dump_path = os.path.join(output_dir, sanitized_name)
                     dump_cmd = [
                         "python2", self.get_volatility_path(),
                         "-f", self.memfile,
                         "--profile={}".format(self.profile),
                         "dumpfiles",
-                        "-Q", offset,
+                        "-Q", name,  
                         "-n",
+                        "-u",
                         "-D", output_dir
                     ]
                     self.insert_text("[*] Running command: {}\n".format(" ".join(dump_cmd)), "info")
                     try:
                         subprocess.call(dump_cmd, stdout=open(os.devnull, 'w'), stderr=subprocess.PIPE)
-                        if os.path.exists(dump_path): # Verificar si el archivo se creó
-                            self.insert_text("[+] Dumped file {} (offset {}) to {}\n".format(name, offset, output_dir), "success")
+                        if os.path.exists(dump_path):  
+                            self.insert_text("[+] Dumped file {} to {}\n".format(name, output_dir), "success")
                         else:
-                            self.insert_text("[!] No data dumped for file {} (offset {}). Consider trying a different profile.\n".format(name, offset), "error")
+                            self.insert_text("[!] No data dumped for file {}. Consider trying a different profile.\n".format(name), "error")
                     except Exception as e:
-                        self.insert_text("[!] Error running dumpfiles for {} (offset {}): {}\n".format(name, offset, str(e)), "error")
+                        self.insert_text("[!] Error running dumpfiles for file {}: {}\n".format(name, str(e)), "error")
 
                 self.insert_text("[+] File dumping completed.\n", "success")
                 selection_window.destroy()
@@ -364,6 +367,9 @@ class VolatilityGUI:
 
         except Exception as e:
             self.insert_text("[!] Exception during dumpfiles: {}\n".format(str(e)), "error")
+
+
+    
 
 if __name__ == "__main__":
     root = tk.Tk()
